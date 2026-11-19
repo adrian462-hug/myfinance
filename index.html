@@ -42,7 +42,8 @@ small{line-height:1.4}
 </header>
 <main>
 <section id="view-home">
- <div class="card"><h2>Monatsbudget</h2><div class="row"><span class="muted">Ausgegeben</span><b id="spent">CHF 0.00</b></div><div class="progress"><div class="bar" id="budgetBar"></div></div><div class="row"><span class="muted">Noch verfügbar</span><b id="left">CHF 1’500.00</b></div><p class="muted" id="budgetHint"></p></div>
+ <div class="card"><h2>Monatsübersicht</h2><label for="monthPicker">Monat auswählen</label><input id="monthPicker" type="month"></div>
+ <div class="card"><h2>Monatsbudget</h2><div class="row"><span class="muted">Ausgegeben</span><b id="spent">CHF 0.00</b></div><div class="progress"><div class="bar" id="budgetBar"></div></div><div class="row"><span class="muted">Noch verfügbar</span><b id="left">CHF 1’500.00</b></div><p class="muted" id="budgetHint"></p><div class="item row"><span class="muted">Davon Fixkosten</span><b id="fixedTotal">CHF 0.00</b></div><div class="item row"><span class="muted">Übrige Ausgaben</span><b id="variableTotal">CHF 0.00</b></div></div>
  <div class="card"><h2>Dein Sparziel</h2><div class="row"><b id="saved">CHF 0.00</b><span class="muted" id="goalPct">0 %</span></div><div class="progress"><div class="bar" id="goalBar"></div></div><div class="muted" id="goalRemaining">Ziel: CHF 10’000.00</div></div>
  <div class="card"><h2>Letzte Buchungen</h2><div id="recent" class="muted">Noch keine Buchungen.</div></div>
 </section>
@@ -60,6 +61,7 @@ small{line-height:1.4}
  <div class="card"><h2>Sparziel</h2><div class="muted">Bereits zurückgelegter Betrag</div><div class="big" style="color:var(--green)" id="savedLarge">CHF 0.00</div><div class="progress"><div class="bar" id="goalBar2"></div></div><div class="muted" id="goalText"></div><label for="deposit">Sparbetrag hinzufügen (CHF)</label><input id="deposit" inputmode="decimal" placeholder="z. B. 100"><button id="addSaving" class="full">Sparbetrag hinzufügen</button><p class="muted">Dies aktualisiert nur deinen Sparziel-Fortschritt. Es wird kein Geld überwiesen.</p></div>
 </section>
 <section id="view-settings" class="hidden">
+ <div class="card"><h2>Wiederkehrende Fixkosten</h2><p class="muted">Hier eingetragene Kosten bleiben dauerhaft in deiner Fixkostenliste und werden jeden Monat automatisch als Ausgabe übernommen. Bereits erzeugte Monatsbuchungen bleiben bestehen.</p><label for="fixedName">Bezeichnung</label><input id="fixedName" placeholder="z. B. Miete"><label for="fixedAmount">Betrag in CHF</label><input id="fixedAmount" inputmode="decimal" placeholder="z. B. 800"><label for="fixedCategory">Kategorie</label><select id="fixedCategory"></select><button id="addFixed" class="full">Fixkosten dauerhaft hinzufügen</button><div id="fixedList" class="muted" style="margin-top:12px">Noch keine Fixkosten gespeichert.</div></div>
  <div class="card"><h2>Deine Planung</h2><label for="budgetInput">Monatsbudget (CHF)</label><input id="budgetInput" inputmode="decimal" value="1500"><label for="goalInput">Sparziel (CHF)</label><input id="goalInput" inputmode="decimal" value="10000"><button id="saveSettings" class="full">Einstellungen speichern</button></div>
  <div class="card"><h2>Sicherheit & Daten</h2><p class="muted">Deine Buchungen werden mit AES-GCM verschlüsselt. Der Schlüssel wird aus deinem PIN abgeleitet und bleibt im lokalen Browserspeicher dieses Geräts.</p><button id="changePin" class="secondary full">PIN ändern</button><p style="margin-top:12px"><button id="export" class="secondary full">Verschlüsseltes Backup exportieren</button></p><p><button id="lockNow" class="danger full">MyFinance sperren</button></p><p class="notice">Wichtig: Lösche Safari-Websitedaten nicht, bevor du ein Backup erstellt hast. Ohne PIN und Backup können die Daten nicht wiederhergestellt werden. Das Backup ist verschlüsselt.</p></div>
 </section>
@@ -69,30 +71,48 @@ small{line-height:1.4}
 <script>
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('de-CH',{style:'currency',currency:'CHF'}).format(n);
-const monthKey=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)};
 const enc=new TextEncoder(),dec=new TextDecoder();
-let state={bookings:[],budget:1500,goal:10000,saved:0},key=null,kind='expense',isChangePin=false;
+let state={bookings:[],recurring:[],budget:1500,goal:10000,saved:0},key=null,kind='expense',isChangePin=false,selectedMonth=monthKey();
 const cats={expense:['Wohnen','Lebensmittel','Mobilität','Versicherungen','Freizeit','Gesundheit','Essen & Trinken','Shopping','Steuern','Sonstiges'],income:['Lohn','Nebenverdienst','Geschenk','Rückzahlung','Zinsen','Sonstiges']};
 function b64(b){return btoa(String.fromCharCode(...new Uint8Array(b)))}
 function un64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
 async function derive(pin,salt){const material=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
 async function encryptData(){const iv=crypto.getRandomValues(new Uint8Array(12));const plain=enc.encode(JSON.stringify(state));const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,plain);localStorage.setItem('myfinance-v1',JSON.stringify({iv:b64(iv),cipher:b64(cipher)}))}
-async function decryptData(k){const raw=localStorage.getItem('myfinance-v1');if(!raw)return {bookings:[],budget:1500,goal:10000,saved:0};const o=JSON.parse(raw);const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(o.iv)},k,un64(o.cipher));return JSON.parse(dec.decode(plain))}
-async function setup(pin){const salt=crypto.getRandomValues(new Uint8Array(16));key=await derive(pin,salt);localStorage.setItem('myfinance-meta',JSON.stringify({salt:b64(salt),check:'MyFinance-PIN-v1'}));state={bookings:[],budget:1500,goal:10000,saved:0};await encryptData();showApp()}
-async function login(pin){const meta=JSON.parse(localStorage.getItem('myfinance-meta'));key=await derive(pin,un64(meta.salt));state=await decryptData(key);showApp()}
+async function decryptData(k){const raw=localStorage.getItem('myfinance-v1');if(!raw)return {bookings:[],recurring:[],budget:1500,goal:10000,saved:0};const o=JSON.parse(raw);const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(o.iv)},k,un64(o.cipher));const s=JSON.parse(dec.decode(plain));s.bookings??=[];s.recurring??=[];s.budget??=1500;s.goal??=10000;s.saved??=0;return s}
+async function setup(pin){const salt=crypto.getRandomValues(new Uint8Array(16));key=await derive(pin,salt);localStorage.setItem('myfinance-meta',JSON.stringify({salt:b64(salt),check:'MyFinance-PIN-v1'}));state={bookings:[],recurring:[],budget:1500,goal:10000,saved:0};await encryptData();showApp()}
+async function login(pin){const meta=JSON.parse(localStorage.getItem('myfinance-meta'));key=await derive(pin,un64(meta.salt));state=await decryptData(key);await ensureRecurringForMonth(monthKey());showApp()}
 function showApp(){$('lock').classList.add('hidden');$('app').classList.remove('hidden');$('pin').value='';render()}
 function lock(){key=null;state={bookings:[],budget:1500,goal:10000,saved:0};$('app').classList.add('hidden');$('lock').classList.remove('hidden');$('lockText').textContent='Gib deinen 4-stelligen PIN ein.';$('unlock').textContent='Entsperren';$('pin').value=''}
 $('unlock').onclick=async()=>{const pin=$('pin').value;if(!/^\d{4}$/.test(pin)){$('lockError').textContent='Bitte genau 4 Ziffern eingeben.';return}try{if(!localStorage.getItem('myfinance-meta'))await setup(pin);else if(isChangePin){const old=key;const oldState=state;await setup(pin);state=oldState;await encryptData();isChangePin=false;render()}else await login(pin)}catch(e){$('lockError').textContent='PIN falsch oder Daten konnten nicht entschlüsselt werden.'}};
 $('pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('unlock').click()});
-function monthBookings(){return state.bookings.filter(b=>b.month===monthKey())}
-function render(){const m=monthBookings(),income=m.filter(b=>b.kind==='income').reduce((s,b)=>s+b.amount,0),expenses=m.filter(b=>b.kind==='expense').reduce((s,b)=>s+b.amount,0),left=state.budget-expenses,pct=Math.min(100,state.saved/state.goal*100||0);
-$('balance').textContent=money(income-expenses);$('income').textContent=money(income);$('expenses').textContent=money(expenses);$('spent').textContent=money(expenses);$('left').textContent=money(left);$('budgetBar').style.width=Math.min(100,expenses/state.budget*100||0)+'%';$('budgetHint').textContent=left<0?'Du hast dein Budget überschritten.':'Du hast noch '+money(left)+' für diesen Monat.';$('saved').textContent=money(state.saved);$('savedLarge').textContent=money(state.saved);$('goalPct').textContent=pct.toFixed(1)+' %';$('goalBar').style.width=pct+'%';$('goalBar2').style.width=pct+'%';$('goalRemaining').textContent='Noch '+money(Math.max(0,state.goal-state.saved))+' bis '+money(state.goal);$('goalText').textContent='Dein Ziel: '+money(state.goal);
+function monthKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function monthLabel(key){const [y,m]=key.split('-').map(Number);return new Intl.DateTimeFormat('de-CH',{month:'long',year:'numeric'}).format(new Date(y,m-1,1))}
+function monthBookings(){return state.bookings.filter(b=>b.month===selectedMonth)}
+async function ensureRecurringForMonth(month){
+ let changed=false;
+ for(const f of (state.recurring||[])){
+  if(month<f.startMonth)continue;
+  if(!state.bookings.some(b=>b.recurringId===f.id&&b.month===month)){
+   const [y,m]=month.split('-').map(Number);
+   state.bookings.unshift({id:crypto.randomUUID(),recurringId:f.id,kind:'expense',amount:f.amount,category:f.category,note:f.name+' · monatlich',date:'01.'+String(m).padStart(2,'0')+'.'+y,month});
+   changed=true;
+  }
+ }
+ if(changed)await encryptData();
+}
+function render(){const m=monthBookings(),income=m.filter(b=>b.kind==='income').reduce((s,b)=>s+b.amount,0),expenses=m.filter(b=>b.kind==='expense').reduce((s,b)=>s+b.amount,0),fixed=m.filter(b=>b.kind==='expense'&&b.recurringId).reduce((s,b)=>s+b.amount,0),variable=expenses-fixed,left=state.budget-expenses,pct=Math.min(100,state.saved/state.goal*100||0);
+$('monthPicker').value=selectedMonth;$('balance').previousElementSibling.textContent='Dein aktueller Saldo · '+monthLabel(selectedMonth);$('balance').textContent=money(income-expenses);$('income').textContent=money(income);$('expenses').textContent=money(expenses);$('spent').textContent=money(expenses);$('left').textContent=money(left);$('budgetBar').style.width=Math.min(100,expenses/state.budget*100||0)+'%';$('budgetHint').textContent=left<0?'Du hast dein Budget überschritten.':'Du hast noch '+money(left)+' in '+monthLabel(selectedMonth)+'.';$('fixedTotal').textContent=money(fixed);$('variableTotal').textContent=money(variable);$('saved').textContent=money(state.saved);$('savedLarge').textContent=money(state.saved);$('goalPct').textContent=pct.toFixed(1)+' %';$('goalBar').style.width=pct+'%';$('goalBar2').style.width=pct+'%';$('goalRemaining').textContent='Noch '+money(Math.max(0,state.goal-state.saved))+' bis '+money(state.goal);$('goalText').textContent='Dein Ziel: '+money(state.goal);
 const row=b=>`<div class="item row"><div><b>${esc(b.category)}</b><div class="muted">${esc(b.date)} · ${esc(b.note|| (b.kind==='income'?'Einnahme':'Ausgabe'))}</div></div><b class="${b.kind==='income'?'pos':'neg'}">${b.kind==='income'?'+':'−'}${money(b.amount)}</b></div>`;
-$('recent').innerHTML=state.bookings.length?state.bookings.slice(0,5).map(row).join(''):'Noch keine Buchungen.';$('allBookings').innerHTML=state.bookings.length?state.bookings.map(row).join(''):'Noch keine Buchungen.';
+$('recent').innerHTML=m.length?m.slice(0,5).map(row).join(''):'Noch keine Buchungen in diesem Monat.';$('allBookings').innerHTML=state.bookings.length?state.bookings.map(row).join(''):'Noch keine Buchungen.';
+$('fixedList').innerHTML=(state.recurring||[]).length?state.recurring.map(f=>`<div class="item row"><div><b>${esc(f.name)}</b><div class="muted">${esc(f.category)} · jeden Monat ab ${esc(f.startMonth)}</div></div><b class="neg">−${money(f.amount)}</b></div>`).join(''):'Noch keine Fixkosten gespeichert.';
 $('budgetInput').value=state.budget;$('goalInput').value=state.goal}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function setKind(k){kind=k;$('expenseTab').classList.toggle('active',k==='expense');$('incomeTab').classList.toggle('active',k==='income');$('expenseTab').classList.toggle('secondary',k!=='expense');$('incomeTab').classList.toggle('secondary',k!=='income');$('category').innerHTML=cats[k].map(c=>`<option>${c}</option>`).join('')}
 $('expenseTab').onclick=()=>setKind('expense');$('incomeTab').onclick=()=>setKind('income');setKind('expense');
+$('fixedCategory').innerHTML=cats.expense.map(c=>`<option>${c}</option>`).join('');
+$('monthPicker').value=selectedMonth;
+$('monthPicker').onchange=async()=>{if(!$('monthPicker').value)return;selectedMonth=$('monthPicker').value;await ensureRecurringForMonth(selectedMonth);render()};
+$('addFixed').onclick=async()=>{const name=$('fixedName').value.trim(),amount=Number($('fixedAmount').value.replace(',','.'));if(!name){alert('Bitte eine Bezeichnung eingeben.');return}if(!Number.isFinite(amount)||amount<=0){alert('Bitte einen gültigen Betrag eingeben.');return}const f={id:crypto.randomUUID(),name,amount,category:$('fixedCategory').value,startMonth:monthKey()};state.recurring??=[];state.recurring.push(f);await ensureRecurringForMonth(selectedMonth);await encryptData();$('fixedName').value='';$('fixedAmount').value='';render();alert('Fixkosten gespeichert. Sie bleiben in deiner Liste und werden ab diesem Monat monatlich übernommen.')};
 $('saveBooking').onclick=async()=>{const amount=Number($('amount').value.replace(',','.'));if(!Number.isFinite(amount)||amount<=0){alert('Bitte einen gültigen Betrag eingeben.');return}state.bookings.unshift({id:crypto.randomUUID(),kind,amount,category:$('category').value,note:$('note').value,date:new Date().toLocaleDateString('de-CH'),month:monthKey()});await encryptData();$('amount').value='';$('note').value='';render();showView('add')};
 $('addSaving').onclick=async()=>{const n=Number($('deposit').value.replace(',','.'));if(!Number.isFinite(n)||n<=0){alert('Bitte einen gültigen Betrag eingeben.');return}state.saved+=n;await encryptData();$('deposit').value='';render()};
 $('saveSettings').onclick=async()=>{const b=Number($('budgetInput').value.replace(',','.')),g=Number($('goalInput').value.replace(',','.'));if(b<=0||g<=0||!Number.isFinite(b)||!Number.isFinite(g)){alert('Bitte gültige Beträge eingeben.');return}state.budget=b;state.goal=g;await encryptData();render();alert('Einstellungen gespeichert.')};
