@@ -45,7 +45,7 @@ small{line-height:1.4}
  <div class="card"><h2>Monatsübersicht</h2><label for="monthPicker">Monat auswählen</label><input id="monthPicker" type="month"></div>
  <div class="card"><h2>Monatsbudget</h2><div class="row"><span class="muted">Ausgegeben</span><b id="spent">CHF 0.00</b></div><div class="progress"><div class="bar" id="budgetBar"></div></div><div class="row"><span class="muted">Noch verfügbar</span><b id="left">CHF 1’500.00</b></div><p class="muted" id="budgetHint"></p><div class="item row"><span class="muted">Davon Fixkosten</span><b id="fixedTotal">CHF 0.00</b></div><div class="item row"><span class="muted">Übrige Ausgaben</span><b id="variableTotal">CHF 0.00</b></div></div>
  <div class="card"><h2>Dein Sparziel</h2><div class="row"><b id="saved">CHF 0.00</b><span class="muted" id="goalPct">0 %</span></div><div class="progress"><div class="bar" id="goalBar"></div></div><div class="muted" id="goalRemaining">Ziel: CHF 10’000.00</div></div>
- <div class="card"><h2>Letzte Buchungen</h2><div id="recent" class="muted">Noch keine Buchungen.</div></div>
+ <div class="card"><h2>Monatlicher Rückblick</h2><p class="muted">Vergleich der letzten 6 Monate bis zum ausgewählten Monat.</p><div id="monthlyStats"></div></div><div class="card"><h2>Letzte Buchungen</h2><div id="recent" class="muted">Noch keine Buchungen.</div></div>
 </section>
 <section id="view-add" class="hidden">
  <div class="card"><h2>Neue Buchung</h2>
@@ -102,9 +102,11 @@ async function ensureRecurringForMonth(month){
 }
 function render(){const m=monthBookings(),income=m.filter(b=>b.kind==='income').reduce((s,b)=>s+b.amount,0),expenses=m.filter(b=>b.kind==='expense').reduce((s,b)=>s+b.amount,0),fixed=m.filter(b=>b.kind==='expense'&&b.recurringId).reduce((s,b)=>s+b.amount,0),variable=expenses-fixed,left=state.budget-expenses,pct=Math.min(100,state.saved/state.goal*100||0);
 $('monthPicker').value=selectedMonth;$('balance').previousElementSibling.textContent='Dein aktueller Saldo · '+monthLabel(selectedMonth);$('balance').textContent=money(income-expenses);$('income').textContent=money(income);$('expenses').textContent=money(expenses);$('spent').textContent=money(expenses);$('left').textContent=money(left);$('budgetBar').style.width=Math.min(100,expenses/state.budget*100||0)+'%';$('budgetHint').textContent=left<0?'Du hast dein Budget überschritten.':'Du hast noch '+money(left)+' in '+monthLabel(selectedMonth)+'.';$('fixedTotal').textContent=money(fixed);$('variableTotal').textContent=money(variable);$('saved').textContent=money(state.saved);$('savedLarge').textContent=money(state.saved);$('goalPct').textContent=pct.toFixed(1)+' %';$('goalBar').style.width=pct+'%';$('goalBar2').style.width=pct+'%';$('goalRemaining').textContent='Noch '+money(Math.max(0,state.goal-state.saved))+' bis '+money(state.goal);$('goalText').textContent='Dein Ziel: '+money(state.goal);
-const row=b=>`<div class="item row"><div><b>${esc(b.category)}</b><div class="muted">${esc(b.date)} · ${esc(b.note|| (b.kind==='income'?'Einnahme':'Ausgabe'))}</div></div><b class="${b.kind==='income'?'pos':'neg'}">${b.kind==='income'?'+':'−'}${money(b.amount)}</b></div>`;
-$('recent').innerHTML=m.length?m.slice(0,5).map(row).join(''):'Noch keine Buchungen in diesem Monat.';$('allBookings').innerHTML=state.bookings.length?state.bookings.map(row).join(''):'Noch keine Buchungen.';
-$('fixedList').innerHTML=(state.recurring||[]).length?state.recurring.map(f=>`<div class="item row"><div><b>${esc(f.name)}</b><div class="muted">${esc(f.category)} · jeden Monat ab ${esc(f.startMonth)}</div></div><b class="neg">−${money(f.amount)}</b></div>`).join(''):'Noch keine Fixkosten gespeichert.';
+const row=b=>`<div class="item"><div class="row"><div><b>${esc(b.category)}</b><div class="muted">${esc(b.date)} · ${esc(b.note|| (b.kind==='income'?'Einnahme':'Ausgabe'))} · ${esc(monthLabel(b.month))}</div></div><b class="${b.kind==='income'?'pos':'neg'}">${b.kind==='income'?'+':'−'}${money(b.amount)}</b></div><div class="actions"><button class="secondary" data-action="edit-booking" data-id="${esc(b.id)}">Bearbeiten</button><button class="danger" data-action="delete-booking" data-id="${esc(b.id)}">Löschen</button></div></div>`;
+$('recent').innerHTML=m.length?m.slice(0,5).map(row).join(''):'Noch keine Buchungen in diesem Monat.';$('allBookings').innerHTML=state.bookings.length?state.bookings.slice().sort((a,b)=>(b.month+b.id).localeCompare(a.month+a.id)).map(row).join(''):'Noch keine Buchungen.';
+$('fixedList').innerHTML=(state.recurring||[]).length?state.recurring.map(f=>`<div class="item"><div class="row"><div><b>${esc(f.name)}</b><div class="muted">${esc(f.category)} · jeden Monat ab ${esc(f.startMonth)}</div></div><b class="neg">−${money(f.amount)}</b></div><div class="actions"><button class="secondary" data-action="edit-fixed" data-id="${esc(f.id)}">Bearbeiten</button><button class="danger" data-action="delete-fixed" data-id="${esc(f.id)}">Löschen</button></div></div>`).join(''):'Noch keine Fixkosten gespeichert.';
+const months=[];const [sy,sm]=selectedMonth.split('-').map(Number);for(let i=5;i>=0;i--){const d=new Date(sy,sm-1-i,1);months.push(monthKey(d))}
+$('monthlyStats').innerHTML='<table class="stats-table"><thead><tr><th>Monat</th><th>Einnahmen</th><th>Ausgaben</th><th>Saldo</th></tr></thead><tbody>'+months.map(mm=>{const arr=state.bookings.filter(b=>b.month===mm),inc=arr.filter(b=>b.kind==='income').reduce((s,b)=>s+b.amount,0),out=arr.filter(b=>b.kind==='expense').reduce((s,b)=>s+b.amount,0);return `<tr><td>${esc(monthLabel(mm))}</td><td>${money(inc)}</td><td>${money(out)}</td><td>${money(inc-out)}</td></tr>`}).join('')+'</tbody></table>';
 $('budgetInput').value=state.budget;$('goalInput').value=state.goal}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function setKind(k){kind=k;$('expenseTab').classList.toggle('active',k==='expense');$('incomeTab').classList.toggle('active',k==='income');$('expenseTab').classList.toggle('secondary',k!=='expense');$('incomeTab').classList.toggle('secondary',k!=='income');$('category').innerHTML=cats[k].map(c=>`<option>${c}</option>`).join('')}
@@ -114,6 +116,36 @@ $('monthPicker').value=selectedMonth;
 $('monthPicker').onchange=async()=>{if(!$('monthPicker').value)return;selectedMonth=$('monthPicker').value;await ensureRecurringForMonth(selectedMonth);render()};
 $('addFixed').onclick=async()=>{const name=$('fixedName').value.trim(),amount=Number($('fixedAmount').value.replace(',','.'));if(!name){alert('Bitte eine Bezeichnung eingeben.');return}if(!Number.isFinite(amount)||amount<=0){alert('Bitte einen gültigen Betrag eingeben.');return}const f={id:crypto.randomUUID(),name,amount,category:$('fixedCategory').value,startMonth:monthKey()};state.recurring??=[];state.recurring.push(f);await ensureRecurringForMonth(selectedMonth);await encryptData();$('fixedName').value='';$('fixedAmount').value='';render();alert('Fixkosten gespeichert. Sie bleiben in deiner Liste und werden ab diesem Monat monatlich übernommen.')};
 $('saveBooking').onclick=async()=>{const amount=Number($('amount').value.replace(',','.'));if(!Number.isFinite(amount)||amount<=0){alert('Bitte einen gültigen Betrag eingeben.');return}state.bookings.unshift({id:crypto.randomUUID(),kind,amount,category:$('category').value,note:$('note').value,date:new Date().toLocaleDateString('de-CH'),month:monthKey()});await encryptData();$('amount').value='';$('note').value='';render();showView('add')};
+
+document.addEventListener('click',async e=>{
+ const btn=e.target.closest('button[data-action]');if(!btn)return;
+ const id=btn.dataset.id,action=btn.dataset.action;
+ if(action==='edit-booking'){
+  const b=state.bookings.find(x=>x.id===id);if(!b)return;
+  const amountText=prompt('Neuer Betrag in CHF:',String(b.amount));if(amountText===null)return;
+  const amount=Number(amountText.replace(',','.'));if(!Number.isFinite(amount)||amount<=0){alert('Bitte einen gültigen Betrag eingeben.');return}
+  const note=prompt('Notiz / Bezeichnung:',b.note||'');if(note===null)return;
+  b.amount=amount;b.note=note;await encryptData();render();
+ }else if(action==='delete-booking'){
+  if(!confirm('Diese einzelne Monatsbuchung wirklich löschen?'))return;
+  state.bookings=state.bookings.filter(x=>x.id!==id);await encryptData();render();
+ }else if(action==='edit-fixed'){
+  const f=(state.recurring||[]).find(x=>x.id===id);if(!f)return;
+  const name=prompt('Bezeichnung:',f.name);if(name===null)return;
+  const amountText=prompt('Monatlicher Betrag in CHF:',String(f.amount));if(amountText===null)return;
+  const amount=Number(amountText.replace(',','.'));if(!name.trim()||!Number.isFinite(amount)||amount<=0){alert('Bitte Bezeichnung und gültigen Betrag eingeben.');return}
+  const category=prompt('Kategorie (z. B. Wohnen, Versicherungen, Mobilität):',f.category);if(category===null)return;
+  f.name=name.trim();f.amount=amount;f.category=category.trim()||f.category;
+  const current=monthKey();
+  for(const b of state.bookings){if(b.recurringId===id&&b.month>=current){b.amount=amount;b.category=f.category;b.note=f.name+' · monatlich'}}
+  await ensureRecurringForMonth(selectedMonth);await encryptData();render();
+ }else if(action==='delete-fixed'){
+  const f=(state.recurring||[]).find(x=>x.id===id);if(!f)return;
+  if(!confirm('Fixkosten-Vorlage „'+f.name+'“ löschen? Bereits gebuchte Monate bleiben als normale Buchungen erhalten. Für zukünftige Monate wird sie nicht mehr übernommen.'))return;
+  state.recurring=state.recurring.filter(x=>x.id!==id);await encryptData();render();
+ }
+});
+
 $('addSaving').onclick=async()=>{const n=Number($('deposit').value.replace(',','.'));if(!Number.isFinite(n)||n<=0){alert('Bitte einen gültigen Betrag eingeben.');return}state.saved+=n;await encryptData();$('deposit').value='';render()};
 $('saveSettings').onclick=async()=>{const b=Number($('budgetInput').value.replace(',','.')),g=Number($('goalInput').value.replace(',','.'));if(b<=0||g<=0||!Number.isFinite(b)||!Number.isFinite(g)){alert('Bitte gültige Beträge eingeben.');return}state.budget=b;state.goal=g;await encryptData();render();alert('Einstellungen gespeichert.')};
 function showView(v){['home','add','save','settings'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));window.scrollTo(0,0)}
