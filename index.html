@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#073d35">
+<title>MyFinance</title>
+<style>
+:root{--green:#073d35;--green2:#155849;--mint:#b8e6cc;--bg:#f3f6f4;--card:#fff;--muted:#64746d;--red:#b84444;--line:#e4ebe6}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#17251f;font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+header{background:var(--green);color:white;padding:calc(18px + env(safe-area-inset-top)) 18px 20px;border-radius:0 0 24px 24px}
+.brand{display:flex;justify-content:space-between;align-items:center}.brand h1{font-size:24px;margin:0}.sub{font-size:11px;letter-spacing:1px;color:#c9e3d5;margin-top:4px}
+.balance{background:white;color:var(--green);padding:17px;border-radius:17px;margin-top:20px}.balance small{color:#5c766a}.big{font-size:30px;font-weight:750;margin-top:5px;font-variant-numeric:tabular-nums}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.metric{background:var(--green2);padding:13px;border-radius:14px}.metric small{color:#d6e9df}.metric strong{display:block;color:white;font-size:17px;margin-top:5px}
+main{padding:16px;max-width:680px;margin:auto}.card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:16px;margin-bottom:14px;box-shadow:0 2px 9px #10271a08}
+h2{font-size:17px;margin:0 0 13px}.muted{color:var(--muted);font-size:13px}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.progress{height:10px;background:#e8eee9;border-radius:20px;overflow:hidden;margin:10px 0}.bar{height:100%;background:#16865d;border-radius:20px;width:0}
+nav{position:fixed;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:9px 8px calc(9px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);z-index:4}
+nav button{background:transparent;color:#53645c;padding:9px 2px;font-size:12px}nav button.active{color:var(--green);font-weight:750}
+button{border:0;border-radius:12px;background:var(--green);color:white;padding:13px 15px;font-size:15px;font-weight:650;cursor:pointer}button.secondary{background:#e8f0eb;color:var(--green)}button.danger{background:#f8eaea;color:var(--red)}button:disabled{opacity:.45}
+input,select{width:100%;padding:13px;border:1px solid #d8e2dc;border-radius:11px;background:white;font-size:16px;color:#17251f;margin:6px 0 12px}
+label{font-size:13px;color:#4f6258;font-weight:650}.full{width:100%}.tabs{display:flex;gap:8px;margin-bottom:13px}.tabs button{flex:1}.item{padding:11px 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}.pos{color:#16865d}.neg{color:var(--red)}
+.hidden{display:none!important}.lock{min-height:100dvh;background:var(--green);display:flex;align-items:center;justify-content:center;padding:25px;color:white}.lockbox{width:min(100%,390px);text-align:center}.lockbox h1{font-size:30px}.lockbox input{text-align:center;font-size:24px;letter-spacing:9px}.lockbox p{color:#d2e6da;font-size:14px}.notice{background:#fff7df;border:1px solid #f1dfa5;padding:12px;border-radius:12px;color:#69551b;font-size:13px;line-height:1.4}
+small{line-height:1.4}
+</style>
+</head>
+<body>
+<section id="lock" class="lock">
+ <div class="lockbox">
+  <div style="font-size:46px">🔐</div><h1>MyFinance</h1>
+  <p id="lockText">Lege deinen persönlichen 4-stelligen PIN fest.</p>
+  <input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
+  <button id="unlock" class="full">PIN speichern</button>
+  <p id="lockError" role="alert"></p>
+  <p>Deine Finanzdaten bleiben auf diesem Gerät verschlüsselt gespeichert.</p>
+ </div>
+</section>
+<div id="app" class="hidden">
+<header>
+ <div class="brand"><div><h1>MyFinance</h1><div class="sub">DEINE PRIVATE FINANZWELT</div></div><div style="font-size:27px">🌿</div></div>
+ <div class="balance"><small>Dein aktueller Saldo · dieser Monat</small><div class="big" id="balance">CHF 0.00</div></div>
+ <div class="metrics"><div class="metric"><small>↙ Einnahmen</small><strong id="income">CHF 0.00</strong></div><div class="metric"><small>↗ Ausgaben</small><strong id="expenses">CHF 0.00</strong></div></div>
+</header>
+<main>
+<section id="view-home">
+ <div class="card"><h2>Monatsbudget</h2><div class="row"><span class="muted">Ausgegeben</span><b id="spent">CHF 0.00</b></div><div class="progress"><div class="bar" id="budgetBar"></div></div><div class="row"><span class="muted">Noch verfügbar</span><b id="left">CHF 1’500.00</b></div><p class="muted" id="budgetHint"></p></div>
+ <div class="card"><h2>Dein Sparziel</h2><div class="row"><b id="saved">CHF 0.00</b><span class="muted" id="goalPct">0 %</span></div><div class="progress"><div class="bar" id="goalBar"></div></div><div class="muted" id="goalRemaining">Ziel: CHF 10’000.00</div></div>
+ <div class="card"><h2>Letzte Buchungen</h2><div id="recent" class="muted">Noch keine Buchungen.</div></div>
+</section>
+<section id="view-add" class="hidden">
+ <div class="card"><h2>Neue Buchung</h2>
+  <div class="tabs"><button id="expenseTab" class="active">− Ausgabe</button><button id="incomeTab" class="secondary">+ Einnahme</button></div>
+  <label for="amount">Betrag in CHF</label><input id="amount" inputmode="decimal" placeholder="z. B. 42.50">
+  <label for="category">Kategorie</label><select id="category"></select>
+  <label for="note">Notiz (optional)</label><input id="note" placeholder="z. B. Wocheneinkauf">
+  <button id="saveBooking" class="full">Buchung speichern</button>
+ </div>
+ <div class="card"><h2>Alle Buchungen</h2><div id="allBookings" class="muted">Noch keine Buchungen.</div></div>
+</section>
+<section id="view-save" class="hidden">
+ <div class="card"><h2>Sparziel</h2><div class="muted">Bereits zurückgelegter Betrag</div><div class="big" style="color:var(--green)" id="savedLarge">CHF 0.00</div><div class="progress"><div class="bar" id="goalBar2"></div></div><div class="muted" id="goalText"></div><label for="deposit">Sparbetrag hinzufügen (CHF)</label><input id="deposit" inputmode="decimal" placeholder="z. B. 100"><button id="addSaving" class="full">Sparbetrag hinzufügen</button><p class="muted">Dies aktualisiert nur deinen Sparziel-Fortschritt. Es wird kein Geld überwiesen.</p></div>
+</section>
+<section id="view-settings" class="hidden">
+ <div class="card"><h2>Deine Planung</h2><label for="budgetInput">Monatsbudget (CHF)</label><input id="budgetInput" inputmode="decimal" value="1500"><label for="goalInput">Sparziel (CHF)</label><input id="goalInput" inputmode="decimal" value="10000"><button id="saveSettings" class="full">Einstellungen speichern</button></div>
+ <div class="card"><h2>Sicherheit & Daten</h2><p class="muted">Deine Buchungen werden mit AES-GCM verschlüsselt. Der Schlüssel wird aus deinem PIN abgeleitet und bleibt im lokalen Browserspeicher dieses Geräts.</p><button id="changePin" class="secondary full">PIN ändern</button><p style="margin-top:12px"><button id="export" class="secondary full">Verschlüsseltes Backup exportieren</button></p><p><button id="lockNow" class="danger full">MyFinance sperren</button></p><p class="notice">Wichtig: Lösche Safari-Websitedaten nicht, bevor du ein Backup erstellt hast. Ohne PIN und Backup können die Daten nicht wiederhergestellt werden. Das Backup ist verschlüsselt.</p></div>
+</section>
+</main>
+<nav><button class="active" data-view="home">⌂<br>Start</button><button data-view="add">＋<br>Buchung</button><button data-view="save">◎<br>Sparen</button><button data-view="settings">⚙<br>Mehr</button></nav>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const money=n=>new Intl.NumberFormat('de-CH',{style:'currency',currency:'CHF'}).format(n);
+const monthKey=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)};
+const enc=new TextEncoder(),dec=new TextDecoder();
+let state={bookings:[],budget:1500,goal:10000,saved:0},key=null,kind='expense',isChangePin=false;
+const cats={expense:['Wohnen','Lebensmittel','Mobilität','Versicherungen','Freizeit','Gesundheit','Essen & Trinken','Shopping','Steuern','Sonstiges'],income:['Lohn','Nebenverdienst','Geschenk','Rückzahlung','Zinsen','Sonstiges']};
+function b64(b){return btoa(String.fromCharCode(...new Uint8Array(b)))}
+function un64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
+async function derive(pin,salt){const material=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function encryptData(){const iv=crypto.getRandomValues(new Uint8Array(12));const plain=enc.encode(JSON.stringify(state));const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,plain);localStorage.setItem('myfinance-v1',JSON.stringify({iv:b64(iv),cipher:b64(cipher)}))}
+async function decryptData(k){const raw=localStorage.getItem('myfinance-v1');if(!raw)return {bookings:[],budget:1500,goal:10000,saved:0};const o=JSON.parse(raw);const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(o.iv)},k,un64(o.cipher));return JSON.parse(dec.decode(plain))}
+async function setup(pin){const salt=crypto.getRandomValues(new Uint8Array(16));key=await derive(pin,salt);localStorage.setItem('myfinance-meta',JSON.stringify({salt:b64(salt),check:'MyFinance-PIN-v1'}));state={bookings:[],budget:1500,goal:10000,saved:0};await encryptData();showApp()}
+async function login(pin){const meta=JSON.parse(localStorage.getItem('myfinance-meta'));key=await derive(pin,un64(meta.salt));state=await decryptData(key);showApp()}
+function showApp(){$('lock').classList.add('hidden');$('app').classList.remove('hidden');$('pin').value='';render()}
+function lock(){key=null;state={bookings:[],budget:1500,goal:10000,saved:0};$('app').classList.add('hidden');$('lock').classList.remove('hidden');$('lockText').textContent='Gib deinen 4-stelligen PIN ein.';$('unlock').textContent='Entsperren';$('pin').value=''}
+$('unlock').onclick=async()=>{const pin=$('pin').value;if(!/^\d{4}$/.test(pin)){$('lockError').textContent='Bitte genau 4 Ziffern eingeben.';return}try{if(!localStorage.getItem('myfinance-meta'))await setup(pin);else if(isChangePin){const old=key;const oldState=state;await setup(pin);state=oldState;await encryptData();isChangePin=false;render()}else await login(pin)}catch(e){$('lockError').textContent='PIN falsch oder Daten konnten nicht entschlüsselt werden.'}};
+$('pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('unlock').click()});
+function monthBookings(){return state.bookings.filter(b=>b.month===monthKey())}
+function render(){const m=monthBookings(),income=m.filter(b=>b.kind==='income').reduce((s,b)=>s+b.amount,0),expenses=m.filter(b=>b.kind==='expense').reduce((s,b)=>s+b.amount,0),left=state.budget-expenses,pct=Math.min(100,state.saved/state.goal*100||0);
+$('balance').textContent=money(income-expenses);$('income').textContent=money(income);$('expenses').textContent=money(expenses);$('spent').textContent=money(expenses);$('left').textContent=money(left);$('budgetBar').style.width=Math.min(100,expenses/state.budget*100||0)+'%';$('budgetHint').textContent=left<0?'Du hast dein Budget überschritten.':'Du hast noch '+money(left)+' für diesen Monat.';$('saved').textContent=money(state.saved);$('savedLarge').textContent=money(state.saved);$('goalPct').textContent=pct.toFixed(1)+' %';$('goalBar').style.width=pct+'%';$('goalBar2').style.width=pct+'%';$('goalRemaining').textContent='Noch '+money(Math.max(0,state.goal-state.saved))+' bis '+money(state.goal);$('goalText').textContent='Dein Ziel: '+money(state.goal);
+const row=b=>`<div class="item row"><div><b>${esc(b.category)}</b><div class="muted">${esc(b.date)} · ${esc(b.note|| (b.kind==='income'?'Einnahme':'Ausgabe'))}</div></div><b class="${b.kind==='income'?'pos':'neg'}">${b.kind==='income'?'+':'−'}${money(b.amount)}</b></div>`;
+$('recent').innerHTML=state.bookings.length?state.bookings.slice(0,5).map(row).join(''):'Noch keine Buchungen.';$('allBookings').innerHTML=state.bookings.length?state.bookings.map(row).join(''):'Noch keine Buchungen.';
+$('budgetInput').value=state.budget;$('goalInput').value=state.goal}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function setKind(k){kind=k;$('expenseTab').classList.toggle('active',k==='expense');$('incomeTab').classList.toggle('active',k==='income');$('expenseTab').classList.toggle('secondary',k!=='expense');$('incomeTab').classList.toggle('secondary',k!=='income');$('category').innerHTML=cats[k].map(c=>`<option>${c}</option>`).join('')}
+$('expenseTab').onclick=()=>setKind('expense');$('incomeTab').onclick=()=>setKind('income');setKind('expense');
+$('saveBooking').onclick=async()=>{const amount=Number($('amount').value.replace(',','.'));if(!Number.isFinite(amount)||amount<=0){alert('Bitte einen gültigen Betrag eingeben.');return}state.bookings.unshift({id:crypto.randomUUID(),kind,amount,category:$('category').value,note:$('note').value,date:new Date().toLocaleDateString('de-CH'),month:monthKey()});await encryptData();$('amount').value='';$('note').value='';render();showView('add')};
+$('addSaving').onclick=async()=>{const n=Number($('deposit').value.replace(',','.'));if(!Number.isFinite(n)||n<=0){alert('Bitte einen gültigen Betrag eingeben.');return}state.saved+=n;await encryptData();$('deposit').value='';render()};
+$('saveSettings').onclick=async()=>{const b=Number($('budgetInput').value.replace(',','.')),g=Number($('goalInput').value.replace(',','.'));if(b<=0||g<=0||!Number.isFinite(b)||!Number.isFinite(g)){alert('Bitte gültige Beträge eingeben.');return}state.budget=b;state.goal=g;await encryptData();render();alert('Einstellungen gespeichert.')};
+function showView(v){['home','add','save','settings'].forEach(x=>$('view-'+x).classList.toggle('hidden',x!==v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));window.scrollTo(0,0)}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+$('lockNow').onclick=lock;
+$('changePin').onclick=()=>{if(!confirm('PIN ändern? Gib danach den neuen PIN ein.'))return;isChangePin=true;$('app').classList.add('hidden');$('lock').classList.remove('hidden');$('lockText').textContent='Lege deinen neuen 4-stelligen PIN fest.';$('unlock').textContent='Neuen PIN speichern';$('pin').value=''};
+$('export').onclick=()=>{const raw=localStorage.getItem('myfinance-v1');if(!raw)return;const blob=new Blob([JSON.stringify({meta:localStorage.getItem('myfinance-meta'),data:raw})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='MyFinance-verschluesseltes-Backup.json';a.click();URL.revokeObjectURL(a.href)};
+if(localStorage.getItem('myfinance-meta')){$('lockText').textContent='Gib deinen 4-stelligen PIN ein.';$('unlock').textContent='Entsperren'}
+if(!window.crypto?.subtle){$('lockError').textContent='Diese Browserumgebung unterstützt keine sichere Verschlüsselung. Öffne MyFinance über eine sichere HTTPS-Adresse.';$('unlock').disabled=true}
+</script>
+</body></html>
